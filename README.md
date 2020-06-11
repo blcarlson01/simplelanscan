@@ -1,2 +1,8 @@
 # simplelanscan
-Simple LAN Scan
+
+Run a simple arp scan of the network and push the results to ElasticSearch.
+
+
+```
+pip install simplelanscan
+```

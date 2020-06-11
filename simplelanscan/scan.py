@@ -12,6 +12,9 @@ import configparser
 from elasticsearch import Elasticsearch
 from scapy.all import ARP, Ether, srp
 from elasticsearch.helpers.actions import bulk
+import time
+import argparse
+import os
 
 def genereate_actions(data):
     for item in data:
@@ -20,10 +23,14 @@ def genereate_actions(data):
             "_source" : item
         }
 
-def send_to_elastic(clients):
+def send_to_elastic(clients, filename, index_file):
     print('loading ElasticSearch...')
     config = configparser.ConfigParser()
-    config.read('config.ini')
+    if not filename == None:
+        config.read(filename)
+    else:
+        config.read('config.ini')    
+    
     host = [config['DEFAULT']['hosts']]
     verify_cert = True if config['DEFAULT']['verify_certs'] == 'True' else False
     ssl_warn =  True if config['DEFAULT']['ssl_show_warn'] == 'True' else False
@@ -34,11 +41,11 @@ def send_to_elastic(clients):
             ssl_show_warn=ssl_warn
         )  
     
-    with open('index.json', 'r') as file:
-        mapping = json.load(file)
-    
-    # ignore 400 already exists code
-    es.indices.create(index="lanclient", body=mapping, ignore=400)
+    if not index_file == None:
+        with open(index_file, 'r') as file:
+            mapping = json.load(file)
+        # ignore 400 already exists code
+        es.indices.create(index="lanclient", body=mapping, ignore=400)
       
     bulk(es, genereate_actions(clients))
     print('Bulk Upload to ElasticSearch Complete')
@@ -52,7 +59,7 @@ def get_domain(clientname):
         domain = 'guest'
     return domain
 
-def scan_network(print_results=False, load_to_elastic=True):
+def scan_network(filename, index, print_results=False, load_to_elastic=True):
     current_time = datetime.datetime.utcnow().isoformat()
     print("Starting at "+ current_time)
     print("scanning....")
@@ -83,11 +90,26 @@ def scan_network(print_results=False, load_to_elastic=True):
         for client in clients:
             print("{:16}    {}     {}".format(client['client']['ip'], client['client']['mac'], client['client']['name']))
     if load_to_elastic:    
-        send_to_elastic(clients)
+        send_to_elastic(clients, filename, index)
         
     print('Scan Complete')
+
+def is_valid_file(parser, arg):
+    if not os.path.exists(arg):
+        parser.error("The file %s does not exist!" % arg)
+    else:
+        return arg
     
 def run_scan():
-    scan_network()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", dest="filename", required=False,
+                    help="config.ini file", metavar="File",
+                    type=lambda x: is_valid_file(parser, x))
+    parser.add_argument("-index", dest="index", required=False,
+                    help="elasticsearch index.json", metavar="File",
+                    type=lambda x: is_valid_file(parser, x))
+    args = parser.parse_args()
 
-run_scan()
+    while True:
+        scan_network(args.filename, args.index)
+        time.sleep(1800) # 30 Minutes
