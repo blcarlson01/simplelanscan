@@ -3,7 +3,8 @@ Description=Scan LAN Clients Service
 After=default.target
 
 [Service]
-ExecStart=/usr/bin/simplelanscan.py
+ExecStart=/usr/local/bin/simplelanscan -i /usr/local/bin/config.ini -index /usr/local/bin/index.json
+User=root
 
 # Disable Python's buffering of STDOUT and STDERR, so that output from the
 # service shows up immediately in systemd's logs
